@@ -6,7 +6,7 @@ import mlflow
 import requests
 from fastapi import BackgroundTasks, FastAPI
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.responses import Response
 
 MODEL_URI = "models:/green-taxi-ride-duration@production"
@@ -26,9 +26,11 @@ PREDICTED_DURATION = Histogram(
 
 
 class Trip(BaseModel):
-    PULocationID: int
-    DOLocationID: int
-    trip_distance: float
+    # NYC TLC taxi zones are numbered 1 to 265
+    PULocationID: int = Field(ge=1, le=265)
+    DOLocationID: int = Field(ge=1, le=265)
+    # Same distance range that train.py keeps
+    trip_distance: float = Field(ge=0.1, le=100)
 
 
 class Prediction(BaseModel):

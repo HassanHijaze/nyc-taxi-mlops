@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.train import FEATURES, TARGET, preprocess
+from src.train import FEATURES, TARGET, preprocess, should_promote
 
 
 def make_trips():
@@ -41,3 +41,19 @@ def test_preprocess_location_ids_are_strings():
 def test_preprocess_keeps_only_features_and_target():
     df = preprocess(make_trips())
     assert list(df.columns) == FEATURES + [TARGET]
+
+
+def test_should_promote_without_production_model():
+    assert should_promote(5.0, None)
+
+
+def test_should_promote_better_model():
+    assert should_promote(4.9, 5.0)
+
+
+def test_should_promote_equal_model():
+    assert should_promote(5.0, 5.0)
+
+
+def test_should_not_promote_worse_model():
+    assert not should_promote(5.1, 5.0)

@@ -80,6 +80,15 @@ jobs:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cml comment create report.md
 
+      - name: Check RMSE quality gate
+        shell: bash
+        run: |
+          rmse=$(grep '^RMSE:' train.log | awk '{print $2}' || true)
+          limit=5.5
+          echo "RMSE: $rmse (limit: $limit)"
+          if [ -z "$rmse" ]; then echo "::error::No RMSE found in train.log"; exit 1; fi
+          awk -v r="$rmse" -v l="$limit" 'BEGIN { exit !(r <= l) }' || { echo "::error::RMSE $rmse is above the limit $limit"; exit 1; }
+
       - name: Upload MLflow run and model
         uses: actions/upload-artifact@v4
         with:

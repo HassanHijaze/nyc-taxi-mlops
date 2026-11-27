@@ -42,6 +42,16 @@ def test_predict_rejects_invalid_input():
     assert response.status_code == 422
 
 
+def test_predict_rejects_invalid_location_id():
+    response = make_client().post("/predict", json={**TRIP, "PULocationID": 0})
+    assert response.status_code == 422
+
+
+def test_predict_rejects_invalid_distance():
+    response = make_client().post("/predict", json={**TRIP, "trip_distance": 0.05})
+    assert response.status_code == 422
+
+
 def test_metrics_counts_predictions():
     client = make_client()
     client.post("/predict", json=TRIP)
