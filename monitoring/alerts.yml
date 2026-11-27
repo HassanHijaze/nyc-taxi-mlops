@@ -1,0 +1,10 @@
+groups:
+  - name: model
+    rules:
+      - alert: PredictionDrift
+        expr: evidently_prediction_drift_score > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prediction drift score is above 0.1"

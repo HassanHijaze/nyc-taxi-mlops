@@ -40,3 +40,11 @@ def test_predict_sends_location_ids_as_strings():
 def test_predict_rejects_invalid_input():
     response = make_client().post("/predict", json={"PULocationID": 236})
     assert response.status_code == 422
+
+
+def test_metrics_counts_predictions():
+    client = make_client()
+    client.post("/predict", json=TRIP)
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert "api_prediction_requests_total" in response.text
