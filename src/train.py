@@ -104,6 +104,11 @@ def main():
         rmse = evaluate(pipeline, X_test, y_test)
         mlflow.log_metric("rmse", rmse)
 
+        # Reference data for drift monitoring: test inputs plus predictions
+        reference = X_test.sample(n=5000, random_state=42)
+        reference["prediction"] = pipeline.predict(reference.to_dict(orient="records"))
+        reference.to_parquet("data/reference.parquet")
+
         model_path = Path("models/model.skops")
         model_path.parent.mkdir(exist_ok=True)
         sio.dump(pipeline, model_path)
