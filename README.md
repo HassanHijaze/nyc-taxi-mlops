@@ -1,4 +1,4 @@
-# Green Taxi Trip Duration: MLOps Project
+# NYC Taxi Trip Duration: End-to-End MLOps Pipeline
 
 A linear regression model that predicts NYC green taxi trip duration, turned from a notebook into an MLOps workflow: versioned data, tracked and registered models, CI training, a prediction API, and drift monitoring.
 
@@ -61,6 +61,8 @@ uv run python -m src.send_data --month 2 --n 500 --sleep 0.2
 
 Setting `MLFLOW_TRACKING_URI` on the training command sends the run to the MLflow container.
 
+`train.py` registers every run as a new model version but moves the `production` alias (and rewrites `data/reference.parquet`) only if its RMSE is less than or equal to the current production model's.
+
 To push new data, add your DagsHub credentials:
 
 ```bash
@@ -94,6 +96,12 @@ Response (predicted duration in minutes):
 ```json
 {"duration": 12.286250807406354}
 ```
+
+## Model registry
+
+Every training run is logged in MLflow and registered as a new version. The `production` alias moves only when the new model's RMSE is less than or equal to the current one.
+
+![MLflow model registry](assets/Mlflow.png)
 
 ## Monitoring
 
@@ -132,7 +140,7 @@ uv run pre-commit install
 
 ## CI
 
-`.github/workflows/train.yaml` runs on every pull request to `main`: lint, unit tests, then it pulls the data with DVC, trains the model, and posts the RMSE as a PR comment with CML. It needs the `DAGSHUB_USER` and `DAGSHUB_TOKEN` repository secrets.
+`.github/workflows/train.yaml` runs on every pull request to `main`: lint, unit tests, then it pulls the data with DVC, trains the model, and posts the RMSE as a PR comment with CML. It needs the `DAGSHUB_USER` and `DAGSHUB_TOKEN` repository secrets. The job fails if the RMSE is above 5.5; the gate runs after the PR comment, so the RMSE is still posted.
 
 ## Known limits
 

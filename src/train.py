@@ -77,6 +77,23 @@ def evaluate(pipeline, X_test, y_test):
     return root_mean_squared_error(y_test, y_pred)
 
 
+def should_promote(new_rmse, production_rmse):
+    # Promote if there is no production model yet or the new one is at least as good
+    return production_rmse is None or new_rmse <= production_rmse
+
+
+def get_production(client):
+    """Return (version, rmse) of the production model, or (None, None) if there is none."""
+    try:
+        mv = client.get_model_version_by_alias(MODEL_NAME, "production")
+    except MlflowException as exc:
+        # MLflow reports a missing alias as INVALID_PARAMETER_VALUE; re-raise anything else.
+        if exc.error_code != "INVALID_PARAMETER_VALUE":
+            raise
+        return None, None
+    return mv.version, client.get_run(mv.run_id).data.metrics.get("rmse")
+
+
 def main():
     load_dotenv()
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
@@ -104,11 +121,6 @@ def main():
         rmse = evaluate(pipeline, X_test, y_test)
         mlflow.log_metric("rmse", rmse)
 
-        # Reference data for drift monitoring: test inputs plus predictions
-        reference = X_test.sample(n=5000, random_state=42)
-        reference["prediction"] = pipeline.predict(reference.to_dict(orient="records"))
-        reference.to_parquet("data/reference.parquet")
-
         model_path = Path("models/model.skops")
         model_path.parent.mkdir(exist_ok=True)
         sio.dump(pipeline, model_path)
@@ -135,12 +147,29 @@ def main():
             model_id=model_info.model_id,
             run_id=run.info.run_id,
         )
-        client.set_registered_model_alias(
-            name=MODEL_NAME, version=mv.version, alias="production"
-        )
+
+        production_version, production_rmse = get_production(client)
+        promoted = should_promote(rmse, production_rmse)
+        if promoted:
+            client.set_registered_model_alias(
+                name=MODEL_NAME, version=mv.version, alias="production"
+            )
+            # Reference data for drift monitoring, written only for the production model
+            reference = X_test.sample(n=5000, random_state=42)
+            reference["prediction"] = pipeline.predict(
+                reference.to_dict(orient="records")
+            )
+            reference.to_parquet("data/reference.parquet")
 
     print(f"RMSE: {rmse}")
-    print(f"Registered model: {MODEL_NAME}, version {mv.version}, alias: production")
+    print(f"Registered model: {MODEL_NAME}, version {mv.version}")
+    if promoted:
+        print(f"Promoted version {mv.version} to production")
+    else:
+        print(
+            f"Kept version {production_version} in production "
+            f"(new RMSE {rmse} > {production_rmse})"
+        )
     print(f"Saved model: {model_path}")
 
 
