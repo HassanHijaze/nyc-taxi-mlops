@@ -44,8 +44,9 @@ jobs:
       - name: Train model
         shell: bash
         run: |
+          uv run python src/train.py | tee train.log
           echo "## Training metrics" > report.md
-          uv run python src/train.py | tee -a report.md
+          grep "RMSE" train.log >> report.md
 
       - name: Post metrics on PR
         if: github.event_name == 'pull_request'
