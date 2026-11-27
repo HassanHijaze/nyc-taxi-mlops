@@ -35,7 +35,7 @@ jobs:
           uv run dvc remote modify origin --local password "$DAGSHUB_TOKEN"
 
       - name: Pull data
-        run: uv run dvc pull
+        run: uv run dvc pull -v
 
       - name: Train model
         run: uv run python src/train.py
