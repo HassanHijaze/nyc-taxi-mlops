@@ -101,7 +101,7 @@ Response (predicted duration in minutes):
 
 Every training run is logged in MLflow and registered as a new version. The `production` alias moves only when the new model's RMSE is less than or equal to the current one.
 
-![MLflow model registry](assets/Mlflow.png)
+![MLflow model registry](assets/mlflow.png)
 
 ## Monitoring
 
