@@ -1,11 +1,11 @@
 import logging
 import os
-import skops.io as sio
 from pathlib import Path
 from urllib.request import urlretrieve
 
 import mlflow
 import pandas as pd
+import skops.io as sio
 from dotenv import load_dotenv
 from mlflow import MlflowClient
 from mlflow.exceptions import MlflowException
@@ -137,5 +137,7 @@ def main():
     print(f"RMSE: {rmse}")
     print(f"Registered model: {MODEL_NAME}, version {mv.version}, alias: production")
     print(f"Saved model: {model_path}")
+
+
 if __name__ == "__main__":
     main()
