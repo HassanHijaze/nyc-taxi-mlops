@@ -1,12 +1,13 @@
 name: Train taxi model
 
 on:
-  push:
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   train:
@@ -21,6 +22,9 @@ jobs:
         uses: astral-sh/setup-uv@v10.2.0
         with:
           version: "0.13.5"
+
+      - name: Set up CML
+        uses: iterative/setup-cml@v2
 
       - name: Install dependencies
         run: uv sync --locked
@@ -38,7 +42,17 @@ jobs:
         run: uv run dvc pull -v
 
       - name: Train model
-        run: uv run python src/train.py
+        shell: bash
+        run: |
+          uv run python src/train.py | tee train.log
+          echo "## Training metrics" > report.md
+          grep "RMSE" train.log >> report.md
+
+      - name: Post metrics on PR
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cml comment create report.md
 
       - name: Upload MLflow run and model
         uses: actions/upload-artifact@v4
