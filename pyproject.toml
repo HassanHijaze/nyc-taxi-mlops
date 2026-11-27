@@ -28,6 +28,9 @@ dev = [
     "ipywidgets>=8.1.9",
     # MLflow records pip's version when packaging the notebook model.
     "pip>=26.0",
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "ruff>=0.17.6",
 ]
 
 [tool.rumdl]
@@ -37,3 +40,8 @@ disable = ["MD013"]
 required-version = ">=0.13.5"
 # Apply certificate fixes without adding unused runtime packages.
 constraint-dependencies = ["certifi>=2026.10.19", "pip>=26.2.2"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = ["integration: needs the running Docker stack"]
+addopts = '-m "not integration"'
