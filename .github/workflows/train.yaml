@@ -1,0 +1,50 @@
+name: Train taxi model
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.13.5"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Configure DVC remote
+        env:
+          DAGSHUB_USER: ${{ secrets.DAGSHUB_USER }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          uv run dvc remote modify origin --local auth basic
+          uv run dvc remote modify origin --local user "$DAGSHUB_USER"
+          uv run dvc remote modify origin --local password "$DAGSHUB_TOKEN"
+
+      - name: Pull data
+        run: uv run dvc pull
+
+      - name: Train model
+        run: uv run python src/train.py
+
+      - name: Upload MLflow run and model
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-output
+          path: |
+            mlflow.db
+            mlruns/
+            models/model.skops
