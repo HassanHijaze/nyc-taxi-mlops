@@ -1,173 +1,142 @@
-# MLOps Project
+# Green Taxi Trip Duration: MLOps Project
 
-Use this repository as a **template** for your MLOps project. You will turn a notebook-based taxi trip-duration model into a reproducible MLOps workflow. You version training data with DVC, track runs with MLflow, automate training with GitHub Actions, serve predictions through an API, and monitor the system with Evidently, Prometheus, and Grafana.
+A linear regression model that predicts NYC green taxi trip duration, turned from a notebook into an MLOps workflow: versioned data, tracked and registered models, CI training, a prediction API, and drift monitoring.
 
-The training notebook is included so you can start from the model used in the monitoring lesson. Keep your project small and use pull requests in your own repository to track your work, even when working alone.
+>
+![Grafana dashboard](assets/grafana.png)
 
-## Learning Objectives
-
-By the end of this repository, you should be able to:
-
-- Convert notebook experimentation into reusable training code.
-- Automate retraining with GitHub Actions.
-- Version training data and model artifacts with DVC and MLflow.
-- Serve a trained model through an API.
-- Monitor model behavior, data quality and operational metrics with an observability stack.
-
-## Learning Path
-
-| File / Folder | Description |
-|---|---|
-| [**Project Description**](project-description.md) | Assignment brief, deliverables, and suggested milestones. |
-| [**01 - Train an ML Model**](01-train-ml-model.ipynb) | Supplied taxi training notebook to refactor into reusable Python code. |
-
-### Additional Folders and Files
-
-| File / Folder | Description |
-|---|---|
-| [**assets**](assets/) | Visual aids referenced in the repository. |
-| [**solution/README.md**](solution/README.md) | Optional reference workflow using Iris, DVC, MLflow, FastAPI, and monitoring. |
-| [**solution/src**](solution/src/) | Data preparation, training, API, and report scripts for the reference solution. |
-| [**solution/monitoring**](solution/monitoring/) | Prometheus configuration and provisioned Grafana dashboard. |
-| [**solution/docker-compose.yaml**](solution/docker-compose.yaml) | The three-service reference stack. |
-| [**.github/workflows/reference-solution.yaml**](.github/workflows/reference-solution.yaml) | Existing workflow that validates the reference pipeline and API. |
-| [**pyproject.toml**](pyproject.toml) | Project configuration and dependencies. |
-| [**uv.lock**](uv.lock) | Dependency lock file shared by the notebook and reference solution. |
-
-The starter notebook comes from [mle-monitoring-in-ml](https://github.com/neuefische/mle-monitoring-in-ml/blob/2a805a98f7d6cf2266b291c0984c98f93bc6d9d3/01-train-ml-model.ipynb). The Iris solution illustrates the operational workflow; it is not a replacement for refactoring your taxi model.
-
-## Project Flow
+## Architecture
 
 ```mermaid
-flowchart TD
-    A["Training data"] --> B["DVC versioning"]
-    B --> C["GitHub Actions training job"]
-    C --> D["MLflow run tracking"]
-    C --> E["Trained model artifact"]
-    E --> F["Prediction API"]
-    F --> G["Prometheus metrics"]
-    F --> H["Evidently monitoring"]
-    G --> I["Grafana dashboards"]
-    H --> J["HTML drift report"]
+flowchart LR
+    subgraph Data
+        DVC["DVC"] --> DagsHub["DagsHub remote"]
+    end
+
+    subgraph CI["GitHub Actions (PR to main)"]
+        Lint["Lint"] --> Tests["Tests"] --> TrainCI["Train"] --> Comment["RMSE comment on PR"]
+    end
+
+    Train["train.py"] --> MLflow["MLflow<br/>tracking + registry"]
+    MLflow -- "model @production" --> API["FastAPI<br/>/predict"]
+    API -- "features + prediction" --> Evidently["Evidently<br/>drift service"]
+    Prometheus["Prometheus"] -- scrapes --> API
+    Prometheus -- scrapes --> Evidently
+    Grafana["Grafana"] -- reads --> Prometheus
 ```
 
-## Local Data Services
+## Tech stack
 
-The notebook uses a local MLflow SQLite tracking store. The reference solution provides an API, Prometheus, and Grafana through Docker Compose:
-
-| Service | Local URL |
+| Area | Tools |
 |---|---|
-| Notebook MLflow UI (when started) | <http://127.0.0.1:5000> |
-| Reference prediction API / Swagger UI | <http://127.0.0.1:8000/docs> |
-| Prometheus targets | <http://127.0.0.1:9090/targets> |
-| Grafana | <http://127.0.0.1:3000> |
-
-Grafana's initial local login is `admin` / `admin`. These services and default credentials are for local learning, not public deployment. Follow [solution/README.md](solution/README.md) to start the reference stack.
+| Environment | uv |
+| Data versioning | DVC + DagsHub |
+| Experiment tracking and registry | MLflow |
+| CI | GitHub Actions + CML |
+| Serving | FastAPI |
+| Monitoring | Evidently, Prometheus, Grafana |
+| Containers | Docker Compose |
+| Quality | pytest, Ruff + pre-commit |
 
 ## Prerequisites
 
-- **Docker Desktop**: required for the reference monitoring stack and for validating a containerized project. Follow the [installation instructions](https://docs.docker.com/get-docker/) if you do not have it yet. Make sure it is **installed and running** before starting the containers.
+- Docker Desktop, installed and running
+- uv 0.13.5 or newer
+- Python 3.13
 
-## Setup
+## How to run
 
-Use [uv](https://docs.astral.sh/uv/getting-started/installation/) 0.13.5 or newer
-and Python 3.13.17 or a newer 3.13 patch release, as defined in
-[`.python-version`](.python-version).
-
-Rebuild existing Docker images with `--pull --no-cache` after this update
-to refresh their system certificates and dependencies.
-
-> [!NOTE]
-> Throughout these steps, text in angle brackets like `<repo-name>` is a **placeholder**. Replace it, including the `< >` brackets, with your own value. For example, `cd <repo-name>` becomes `cd mle-mlops-project`.
-
-### 1. Use This Repository as a Template
-
-Click **Use this template** on GitHub.
-
-When creating the repository:
-
-- Set yourself as the **Owner**
-- Choose a repository name
-- Disable **Include all branches**
-- Click **Create repository**
-
-> [!IMPORTANT]
-> If you are working in pairs or groups, only **one person** should complete this step.
-
----
-
-### 2. Add Collaborators (Pairs/Groups Only)
-
-If working with teammates:
-
-1. Open the repository on GitHub
-2. Go to **Settings → Collaborators**
-3. Add your teammates as collaborators
-4. Share the repository link with your team
-
-Teammates should accept the invitation before continuing.
-
----
-
-### 3. Clone the Repository
-
-Copy the SSH URL from the **Code** button on GitHub, then run:
+Run the steps in this order. The API loads the registered model from MLflow at startup, and the Evidently service needs `data/reference.parquet`, which `train.py` writes.
 
 ```bash
-git clone <copied-ssh-url>
-```
-
-The copied SSH URL will look like `git@github.com:<your-username>/<repo-name>.git`.
-
----
-
-### 4. Move into the Project Folder and Install Dependencies
-
-This project uses Python 3.13. The command below installs all dependencies and creates a virtual environment in `.venv/`.
-
-```bash
-cd <repo-name>
 uv sync
-```
-
-The notebook and `solution/` share this environment. Do not create another environment inside `solution/`.
-
----
-
-### 5. Create the Environment File
-
-Copy the template once:
-
-```bash
 cp .env.example .env
+uv run dvc pull
+docker compose up -d mlflow
+MLFLOW_TRACKING_URI=http://localhost:5000 uv run python src/train.py
+docker compose up --build -d
+uv run python -m src.send_data --month 1 --n 500 --sleep 0.2
+uv run python -m src.send_data --month 2 --n 500 --sleep 0.2
 ```
 
-Keep the default local tracking URI for the taxi notebook. The Iris reference solution manages its own tracking store in `solution/mlflow.db`.
+Setting `MLFLOW_TRACKING_URI` on the training command sends the run to the MLflow container.
 
-> [!CAUTION]
-> Never commit `.env`. It is git-ignored because environment files often hold secrets. Only `.env.example`, with placeholder or default values, belongs in the repository.
-
----
-
-### 6. Open the Repository in VS Code
-
-> [!NOTE]
-> Make sure you open VS Code from the project root so it automatically detects the environment created by `uv sync`.
-
-Launch VS Code in the project root folder:
+To push new data, add your DagsHub credentials:
 
 ```bash
-code .
+uv run dvc remote modify origin --local auth basic
+uv run dvc remote modify origin --local user <dagshub-user>
+uv run dvc remote modify origin --local password <dagshub-token>
 ```
 
-Then open [01-train-ml-model.ipynb](01-train-ml-model.ipynb) and select the Python environment created by `uv sync` as the kernel.
+The two `send_data` runs replay January trips (same month as the training data) and then February trips, so you can compare the dashboard before and after.
 
-Run the notebook from the project root. Python commands use `uv run`, so the environment is selected automatically; no manual activation is needed.
+### Services
 
-## References & Further Reading
+| Service | URL |
+|---|---|
+| MLflow | <http://localhost:5000> |
+| API docs | <http://localhost:8000/docs> |
+| Evidently metrics | <http://localhost:8001/metrics> |
+| Prometheus | <http://localhost:9090> |
+| Grafana | <http://localhost:3000> (login `admin` / `admin`, local only) |
 
-- [DVC Pipelines](https://dvc.org/doc/user-guide/pipelines): Version training inputs and reproduce dependent stages.
-- [MLflow Model Registry Workflows](https://mlflow.org/docs/latest/ml/model-registry/workflow/): Register models, manage versions, and assign aliases.
-- [Evidently Reports](https://docs.evidentlyai.com/docs/library/report): Compare reference and current datasets and export reports.
-- [Prometheus Overview](https://prometheus.io/docs/introduction/overview/): Understand metric scraping, time series, and PromQL queries.
-- [Grafana Provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/): Load data sources and dashboards from version-controlled files.
+### Example request
+
+```bash
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"PULocationID": 74, "DOLocationID": 75, "trip_distance": 2.5}'
+```
+
+Response (predicted duration in minutes):
+
+```json
+{"duration": 12.286250807406354}
+```
+
+## Monitoring
+
+**API metrics** (`localhost:8000/metrics`):
+
+- `api_prediction_requests_total`: number of predictions
+- `api_prediction_latency_seconds`: prediction latency
+- `api_predicted_duration_minutes`: distribution of predicted durations
+
+**Drift metrics** (`localhost:8001/metrics`): the API sends each request's features and prediction to the Evidently service, which keeps the latest 200 events and compares them with `data/reference.parquet` (a sample of the training test set with its predictions). Drift is recomputed every 50 events.
+
+- `evidently_drift_share`: share of drifted columns
+- `evidently_prediction_drift_score`: drift score of the predictions
+- `evidently_column_drift_score`: drift score per column
+- `evidently_duration_share`: share of predictions per duration bucket, training vs. current
+- `evidently_window_rows`: rows in the current window
+
+Drift uses Wasserstein distance for numeric columns (`trip_distance`, `prediction`) and Jensen–Shannon distance for the location IDs, with a threshold of 0.1.
+
+**Alert:** `PredictionDrift` fires in Prometheus when `evidently_prediction_drift_score` stays above 0.1 for 1 minute.
+
+**Report:** each drift run also saves an HTML report to `reports/drift_report.html`.
+
+## Testing
+
+```bash
+uv run pytest                  # unit tests
+uv run pytest -m integration   # integration tests, needs the stack running
+```
+
+Pre-commit runs `ruff check --fix` and `ruff format` on `src/` and `tests/`:
+
+```bash
+uv run pre-commit install
+```
+
+## CI
+
+`.github/workflows/train.yaml` runs on every pull request to `main`: lint, unit tests, then it pulls the data with DVC, trains the model, and posts the RMSE as a PR comment with CML. It needs the `DAGSHUB_USER` and `DAGSHUB_TOKEN` repository secrets.
+
+## Known limits
+
+- Grafana uses the default `admin` / `admin` login, which is fine only for local use.
+- The drift window of 200 events is small compared with the number of location IDs, so drift scores for `PULocationID` and `DOLocationID` are noisy.
+
+The starter notebook comes from [mle-monitoring-in-ml](https://github.com/neuefische/mle-monitoring-in-ml/blob/2a805a98f7d6cf2266b291c0984c98f93bc6d9d3/01-train-ml-model.ipynb).
